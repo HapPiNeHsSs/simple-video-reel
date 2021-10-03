@@ -1,0 +1,152 @@
+<html>
+
+<head>
+  <title>Video Reel List</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+</head>
+
+<body style="padding: 20px">
+<div class="text form-group field-video-reel-list">
+    <h3>Video Reel List</h3>
+    <select name="video-reels[]" id="video-reels" size=10 style="width: 300px;">
+        {% for video_reel in video_reels %}
+            <option value="{{video_reel['id']}}" selected="true" id="videos-0">{{ video_reel['name'] }}</option>
+        {% endfor %}
+    </select>
+</div>
+
+<div class="text form-group field-video-reel-name">
+    <span>
+        <label for="video-reel-name" class="text-label">Video Reel Name: </label>
+        <span id="video-reel-name"></span>
+    <span>
+</div>
+
+<div class="text form-group field-video-reel-duration">
+    <span>
+        <label for="video-reel-duration" class="text-label">Duration in HH:MM:SS:ff: </label>
+        <span id="video-reel-duration">00:00:00:00</span>
+    <span>
+</div>
+
+<div class="select form-group field-video-standard">
+    <span>
+        <label for="video-standard" class="text-label">Standard: </label>
+        <span id="video-standard"></span>
+    <span>
+</div>
+<div class="select form-group field-video-definition">
+    <div class="select form-group field-video-standard">
+        <span>
+            <label for="video-definition" class="text-label">Definition: </label>
+            <span id="video-definition"></span>
+        <span>
+    </div>
+</div>
+
+<div>
+    <label for="videos" class="select-label">Videos in Reel</label><br>
+    <select name="videos[]" id="videos" size=10 style="width: 300px;">
+    </select>
+</div>
+
+
+
+
+<h3>Selected Video Details</h3>
+<div id="video-details">
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+</div>
+
+<div>
+    <button type="button" onclick="location.href='/create_video_reel';" class="btn-default btn" name="add-video-reel" access="false" style="background-color: #4CAF50" id="add-video-reel">Create New Video Reel</button>
+    <button type="button" onclick="location.href='/video_list';"class="btn-default btn" name="add-video" access="false" style="background-color: #ff9691" id="add-video">View or Add Video Details</button>
+</div>
+
+</body>
+</html>
+
+<script>
+
+
+function showErrorText(message){
+    $('#error-text').html(message).animate({opacity:1});
+    setTimeout(function() {
+        $('#error-text').animate({opacity:0});
+    }, 2000 );
+}
+
+function createInfoFromObj(obj){
+    html = '<table id="data_info" style="">';
+    $.each(obj, (k,v) =>{
+        if(typeof v === 'object'){
+            v=JSON.stringify(v);
+        }
+        html+="<tr><td style='text-transform: capitalize; font-weight: bold; vertical-align: top; padding: 5px;'>"+k+"</td>"+"<td style='vertical-align: top; padding: 5px;'>"+v+"</td></tr>";
+    });
+    return html+="</table>";
+}
+
+$(() => {
+    var videos = {{ videos | tojson }}
+    var video_reels = {{ video_reels | tojson }}
+    var duration_in_frames = 0;
+
+    $("#video-standard, #video-definition").change(() => {
+        //clear videos in reel if standard or definition is changed
+        showErrorText("Clearing Video Reel");
+        $("#videoreel > option").each(function() {
+            sel = $(this);
+            data = videos.find((o) => { return o['id'] === parseInt(sel.val()) })
+            $('#videos')
+                .append($('<option>', { value : data['id'] })
+                .text(data['name']));
+                sel.remove();
+        });
+        // The following routine just makes sure that the options are still ordered
+            // by DB index when pushed back to the available video list
+        videos_options = $('#videos option');
+
+        videos_options.sort((a,b) => {
+            a = a.value;
+            b = b.value;
+            return a-b;
+        });
+        $('#videos').html(videos_options);
+    });
+
+     $("#video-reels").click(function() {
+		var selectedVal = $("option:selected", this).val();
+        data = video_reels.find((o) => { return o['id'] === parseInt(selectedVal) })
+        $("#video-reel-name").html(data["name"]);
+        $("#video-reel-duration").html(data["timecode"]["timecode"]);
+        $("#video-standard").html(data["standard"]);
+        $("#video-definition").html(data["definition"]);
+        $('#videos option').remove();
+        $.each(data["videos"], (k,v) =>{
+            $('#videos')
+                .append($('<option>', { value : v['id'] })
+                .text(v['name']));
+        });
+		//$("#video-details").val(JSON.stringify(data));
+	});
+
+    $("#videos").click(function() {
+        $("#video-details").empty();
+		var selectedVal = $("option:selected", this).val();
+        data = videos.find((o) => { return o['id'] === parseInt(selectedVal) })
+        $("#video-details").append(createInfoFromObj(data));
+		//$("#video-details").val(JSON.stringify(data));
+	});
+
+});
+</script>

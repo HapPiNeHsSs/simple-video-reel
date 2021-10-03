@@ -1,0 +1,147 @@
+<html>
+
+<head>
+  <title>Video List</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+</head>
+
+<body style="padding: 20px">
+<form id='create-video'>
+    <h2>Add Video Detail</h1>
+    <div class="text form-group field-video-name">
+        <label for="video-name" class="text-label">Video Name<span class="required">*</span></label>
+        <input type="text" name="video-name" access="false" id="video-name" required="required" aria-required="true">
+    </div>
+    <div class="textarea form-group field-video-description">
+        <label for="video-description" class="textarea-label">Description<span class="required">*</span></label><br>
+        <textarea type="textarea" name="video-description" access="false" rows="3" id="video-description" required="required" aria-required="true"></textarea>
+    </div>
+    <div class="select form-group field-video-standard">
+        <label for="video-standard" class="select-label">Standard</label>
+        <select name="video-standard" id="video-standard" required="required" aria-required="true">
+            <option value="ntsc" selected="true" id="video-standard-0">NTSC</option>
+            <option value="pal" id="video-standard-1">PAL</option>
+        </select>
+    </div>
+    <div class="select form-group field-video-definition">
+        <label for="video-definition" class="select-label">Definition</label>
+        <select name="video-definition" id="video-definition" required="required" aria-required="true">
+            <option value="sd" id="video-definition-1">SD</option>
+            <option value="hd" selected="true" id="video-definition-0">HD</option>
+        </select>
+    </div>
+    <div class="text form-group field-video-duration">
+        <label for="video-duration" class="text-label">Duration in HH:MM:SS:ff<span class="tooltip-element" tooltip="Enter Duration in HH:MM:SS">?</span></label>
+        <input type="text" placeholder="HH:MM:SS:ff" name="video-duration" access="false" id="video-duration" title="Enter Duration in HH:MM:SS" required="required" aria-required="true">
+    </div>
+    <div class="button form-group field-add-video">
+        <button type="submit" class="btn-default btn" name="add-video" access="false" style="default" id="add-video">Add Video</button>
+    </div>
+</form>
+<hr>
+<h2>View Current Video Details</h2>
+<form id='video_list'>
+    <div class="select form-group field-videos">
+        <label for="videos" class="select-label">Available Videos</label><br>
+        <select name="videos[]" id="videos" size=10 style="width: 300px;">
+            {% for video in videos %}
+                {{ video['name']}}
+                 <option value="{{video['id']}}" selected="true" id="videos-0">{{ video['name'] }}</option>
+            {% endfor %}
+        </select>
+        <div class="button form-group field-del-video">
+        <button type="button" class="btn-default btn" name="del-video" access="false" style="default" id="del-video">Delete Video</button>
+    </div>
+    </div>
+    <div class="textarea form-group field-video-details">
+        <label for="video-details" class="textarea-label">Video Details</label><br>
+        <textarea type="textarea" name="video-details" access="false" rows="6" id="video-details" style="width: 600px;"></textarea>
+    </div>
+</form>
+</body>
+</html>
+
+<script>
+function getFormData($form){
+    var unindexed_array = $form.serializeArray();
+    var indexed_array = {};
+
+    $.map(unindexed_array, (n, i) => {
+        indexed_array[n['name']] = n['value'];
+    });
+
+    return indexed_array;
+}
+
+$(() => {
+    var videos = {{ videos | tojson }}
+    
+    $("#videos").click(() => {
+		var selectedVal = $("#videos option:selected").val();
+        data = videos.find((o) => { return o['id'] === parseInt(selectedVal) })
+		$("#video-details").val(JSON.stringify(data));
+
+	});
+
+    $("#del-video").click( () => {
+        data= {}
+        data['id'] = $("#videos option:selected").val();
+        $.ajax({
+                url : "/api/video", 
+                type: "DELETE",
+                data: JSON.stringify(data),
+                contentType: "application/json; charset=utf-8",
+                async : false, 
+                success: (response, textStatus, jqXHR) => {
+                    $("#videos option[value=" +data['id']+ "]").remove();
+                    $("#video-details").val('');
+                },
+                error: (jqXHR, textStatus, errorThrown) => {
+                    alert(errorThrown)
+                }
+            });
+    });
+
+
+    $("#create-video").submit(function(e) {
+        e.preventDefault();
+        var chk_status = this[0].checkValidity();
+        this[0].reportValidity();
+        if (chk_status) {
+            var data = getFormData($("#create-video"));
+            if(data['video-standard']=="pal")
+                if (!/^(?:[01]\d|2[0123]):(?:[012345]\d):(?:[012345]\d):(?:[01]\d|2[0123])/.test($("#video-duration").val())){
+                    alert("Use HH:MM:SS:[00-24] format")
+                    return false
+                }
+            if(data['video-standard']=="ntsc")
+                if (!/^(?:[01]\d|2[012356]):(?:[012345]\d):(?:[012345]\d):(?:[01]\d|2[0123456789])/.test($("#video-duration").val())){
+                    alert("Use HH:MM:SS:[00-30] format")
+                    return false
+                }
+            
+            $.ajax({
+                url : "/api/video", 
+                type: "POST",
+                data: JSON.stringify(data),
+                contentType: "application/json; charset=utf-8",
+                async : false, 
+                success: (response, textStatus, jqXHR) => {
+                    $('#videos')
+                    .append($('<option>', { value : response['id'] })
+                    .text(response['name']));
+                    videos.push(response);
+                },
+                error: (jqXHR, textStatus, errorThrown) => {
+                    alert(errorThrown)
+                }
+            });
+        } 
+        
+    });
+});
+</script>

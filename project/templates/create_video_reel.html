@@ -1,0 +1,277 @@
+<html>
+
+<head>
+  <title>Video List</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+</head>
+
+<body style="padding: 20px">
+<form id='create-video-reel'>
+    <h2>VideoReel</h1>
+    <div class="text form-group field-video-reel-name">
+        <label for="video-reel-name" class="text-label">Video Reel Name<span class="required">*</span></label>
+        <input type="text" name="video-reel-name" access="false" id="video-reel-name" required="required" aria-required="true">
+    </div>
+    
+    <div class="select form-group field-video-standard">
+        <label for="video-standard" class="select-label">Standard</label>
+        <select name="video-standard" id="video-standard" required="required" aria-required="true">
+            <option value="ntsc" selected="true" id="video-standard-0">NTSC</option>
+            <option value="pal" id="video-standard-1">PAL</option>
+        </select>
+    </div>
+    <div class="select form-group field-video-definition">
+        <label for="video-definition" class="select-label">Definition</label>
+        <select name="video-definition" id="video-definition" required="required" aria-required="true">
+            <option value="sd" id="video-definition-1">SD</option>
+            <option value="hd" selected="true" id="video-definition-0">HD</option>
+        </select>
+    </div>
+    <div id="error-text" style="padding-left: 20px; color:red; font-weight: bold;">
+            &nbsp;
+    </div>
+
+    <div class="select form-group field-videos" style="display: flex; flex-wrap: wrap; align-items: center;">
+        <div style="padding: 20px">
+            <label for="videos" class="select-label">Available Videos</label><br>
+            <select name="videos[]" id="videos" size=10 style="width: 300px;">
+                {% for video in videos %}
+                    {{ video['name']}}
+                    <option value="{{video['id']}}" selected="true" id="videos-0">{{ video['name'] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="display: grid; justify-items: center;">
+            <div class="button form-group field-add-to-reel">
+                <button type="button" class="btn-default btn" name="add-to-reel" access="false" style="default" id="add-to-reel">Add To Reel >>></button>
+            </div>
+            <div class="button form-group field-del-remove-from-reel">
+                <button type="button" class="btn-default btn" name="remove-from-reel" access="false" style="default" id="remove-from-reel"><<< Remove From Reel</button>
+            </div>
+        </div>
+        <div style="padding: 20px">
+            <label for="videoreel" class="select-label">Videos in Reel</label><br>
+            <select name="videoreel[]" id="videoreel" size=10 style="width: 300px;">
+               
+            </select>
+        </div>
+    </div>
+
+    <span>
+        <label for="video-duration" class="text-label">Duration in HH:MM:SS:ff: </label>
+        <span id="video-duration">00:00:00:00</span>
+    <span>
+    
+    <div class="button form-group field-add-video">
+        <button type="submit" class="btn-default btn" name="add-video" access="false" style="default" id="add-video">Create Video Reel</button>
+    </div>
+</form>
+<hr>
+<h2>Selected Video Details</h2>
+<div id="video-details">
+</div>
+</body>
+</html>
+
+<script>
+
+function getFormData($form){
+    var unindexed_array = $form.serializeArray();
+    var indexed_array = {};
+
+    $.map(unindexed_array, (n, i) => {
+        indexed_array[n['name']] = n['value'];
+    });
+
+    return indexed_array;
+}
+
+function showErrorText(message){
+    $('#error-text').html(message).animate({opacity:1});
+    setTimeout(function() {
+        $('#error-text').animate({opacity:0});
+    }, 2000 );
+}
+
+function createInfoFromObj(obj){
+    html = '<table id="data_info" style="">';
+    $.each(obj, (k,v) =>{
+        if(typeof v === 'object'){
+            v=JSON.stringify(v);
+        }
+        html+="<tr><td style='text-transform: capitalize; font-weight: bold; vertical-align: top; padding: 5px;'>"+k+"</td>"+"<td style='vertical-align: top; padding: 5px;'>"+v+"</td></tr>";
+    });
+    return html+="</table>";
+}
+
+$(() => {
+    var videos = {{ videos | tojson }}
+    var duration_in_frames = 0;
+
+    $("#video-standard, #video-definition").change(() => {
+        //clear videos in reel if standard or definition is changed
+        showErrorText("Clearing Video Reel");
+        $("#videoreel > option").each(function() {
+            sel = $(this);
+            data = videos.find((o) => { return o['id'] === parseInt(sel.val()) })
+            $('#videos')
+                .append($('<option>', { value : data['id'] })
+                .text(data['name']));
+                sel.remove();
+        });
+        // The following routine just makes sure that the options are still ordered
+            // by DB index when pushed back to the available video list
+        videos_options = $('#videos option');
+
+        videos_options.sort((a,b) => {
+            a = a.value;
+            b = b.value;
+            return a-b;
+        });
+        $('#videos').html(videos_options);
+    });
+
+    $("#videos, #videoreel").click(function() {
+        $("#video-details").empty();
+		var selectedVal = $("option:selected", this).val();
+        data = videos.find((o) => { return o['id'] === parseInt(selectedVal) })
+        $("#video-details").append(createInfoFromObj(data));
+		//$("#video-details").val(JSON.stringify(data));
+	});
+
+    $("#add-to-reel").click( () => {
+        selectedObj = $("#videos option:selected");
+        data = videos.find((o) => { return o['id'] === parseInt(selectedObj.val()) })
+
+        if( $('#videoreel').has('option').length == 0 ) {
+            //first selected, safe to auto select standard and definition
+            $("#video-standard").val(data["standard"]);
+            $("#video-definition").val(data["definition"]);
+            showErrorText("First Item, Autosetting Standard and Definition to this item");
+        }
+
+        if($("#video-standard").val() != data['standard']){
+            showErrorText("Cannot add "+data["standard"]+" to "+$("#video-standard").val()+" Video Reel");
+            return
+        }
+        if($("#video-definition").val() != data['definition']){
+            showErrorText("Cannot add "+data["definition"]+" to "+$("#video-definition").val()+" Video Reel");
+            return
+        }
+
+         $('#videoreel')
+            .append($('<option>', { value : data['id'] })
+            .text(data['name']));
+        
+        selectedObj.remove();
+
+        duration_in_frames = 0
+        $("#videoreel > option").each(function() {
+            sel = $(this);
+            var data = videos.find((o) => { return o['id'] === parseInt(sel.val()) })
+            duration_in_frames+=data['timecode']['totalframes']
+        });
+
+        $.ajax({
+            url : "/api/calculate_duration", 
+            type: "POST",
+            data: JSON.stringify({'total_frames':duration_in_frames,'standard':$("#video-standard").val()}),
+            contentType: "application/json; charset=utf-8",
+            async : false, 
+            success: (response, textStatus, jqXHR) => {
+                $('#video-duration').html(response["total_duration"]["timecode"])
+            },
+            error:  (jqXHR, textStatus, errorThrown) => {
+                alert(errorThrown)
+            }
+        });
+
+       
+    });
+
+    $("#remove-from-reel").click(() => {
+        selectedObj = $("#videoreel option:selected");
+        data = videos.find((o) => { return o['id'] === parseInt(selectedObj.val()) })
+        $('#videos')
+            .append($('<option>', { value : data['id'] })
+            .text(data['name']));
+        selectedObj.remove();
+        duration_in_frames = 0;
+
+        $("#videoreel > option").each(function() {
+            sel = $(this);
+            var data = videos.find((o) => { return o['id'] === parseInt(sel.val()) })
+            duration_in_frames+=data['timecode']['totalframes']
+        });
+
+        $.ajax({
+            url : "/api/calculate_duration", 
+            type: "POST",
+            data: JSON.stringify({'total_frames':duration_in_frames,'standard':$("#video-standard").val()}),
+            contentType: "application/json; charset=utf-8",
+            async : false, 
+            success: (response, textStatus, jqXHR) => {
+                $('#video-duration').html(response["total_duration"]["timecode"])
+            },
+            error:  (jqXHR, textStatus, errorThrown) => {
+                alert(errorThrown)
+            }
+        });
+        
+        // The following routine just makes sure that the options are still ordered
+        // by DB index when pushed back to the available video list
+        videos_options = $('#videos option');
+
+        videos_options.sort((a,b) => {
+            a = a.value;
+            b = b.value;
+            return a-b;
+        });
+        $('#videos').html(videos_options);
+    });
+
+
+    $("#create-video-reel").submit( function(e) {
+        e.preventDefault();
+        var chk_status = this[0].checkValidity();
+        this[0].reportValidity();
+        if (chk_status) {
+            if( $('#videoreel').has('option').length == 0 ) {
+                //Prevent sending if videoreel has no members
+                showErrorText("Vide reel needs some members");
+                return false
+            }
+            var data = getFormData($("#create-video-reel"));
+            video_list=[];
+            $("#videoreel > option").each(function() {
+                sel = $(this);
+                var data = videos.find((o) => { return o['id'] === parseInt(sel.val()) })
+                video_list.push(data['id'])
+            });
+            data['video_list'] = video_list
+            data['totalframes'] = duration_in_frames
+
+            $.ajax({
+                url : "/api/video_reel", 
+                type: "POST",
+                data: JSON.stringify(data),
+                contentType: "application/json; charset=utf-8",
+                async : false, 
+                success: (response, textStatus, jqXHR) => {
+                    location.href="/"
+                },
+                error:  (jqXHR, textStatus, errorThrown) => {
+                    alert(errorThrown)
+                }
+            });
+            
+           
+        } 
+        
+    });
+});
+</script>
