@@ -1,4 +1,4 @@
-# Simple Social Feed 
+# Simple Video Reel 
 
 ## Running via Python3 ##
 
